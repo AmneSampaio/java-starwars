@@ -10,143 +10,108 @@ import org.apache.http.util.EntityUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestOperations;
-import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 
 @RestController
 @RequestMapping(path = "cinema/starwars/vehicles/")
 public class VehicleController {
 
-    private static String uri = "https://swapi.dev/api/vehicles";
+    private static String uri = "https://swapi.dev/api/vehicles/";
 
     @GetMapping(path = "getAll")
-    public ResponseEntity getAllVehicles() throws IOException, InterruptedException, ParseException {
+    public static ResponseEntity<ArrayList<Vehicle>> getAllVehicles() throws IOException, ParseException {
 
-        CloseableHttpClient httpClient = HttpClients.createDefault();
+        ArrayList<Vehicle> vehiclesList;
 
-        Boolean nextPage;
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
 
-        JSONParser parser = new JSONParser();
-        ArrayList<JSONObject> resultsList = new ArrayList<JSONObject>();
+            boolean nextPage;
 
-        do {
-            nextPage = false;
-            HttpGet request = new HttpGet(uri); // montando a request
-            CloseableHttpResponse response = httpClient.execute(request); // onde dá o play
+            JSONParser parser = new JSONParser();
+            ArrayList<JSONObject> resultsList = new ArrayList<>();
 
-            HttpEntity entity = response.getEntity();
-            String responseString = EntityUtils.toString(entity, "UTF-8");
+            do {
+                nextPage = false;
+                HttpGet request = new HttpGet(uri); // montando a request
+                CloseableHttpResponse response = httpClient.execute(request); // onde faz a request
 
-            JSONObject json = (JSONObject) parser.parse(responseString);
-            resultsList.addAll((ArrayList<JSONObject>) json.get("results"));
+                HttpEntity entity = response.getEntity();
+                String responseString = EntityUtils.toString(entity, "UTF-8");
 
-            if (!(json.get("next") == null)) {
+                JSONObject json = (JSONObject) parser.parse(responseString);
+                resultsList.addAll((ArrayList<JSONObject>) json.get("results"));
+
+            if ((json.get("next") != null)) {
                 uri = json.get("next").toString();
                 nextPage = true;
 
+                }
+
+                response.close();
+
+            } while (Boolean.TRUE.equals(nextPage));
+
+            vehiclesList = new ArrayList<>();
+
+            for (JSONObject item : resultsList) {
+
+                String urlWithId = (String) item.get("url");
+
+                String[] parts = urlWithId.split("/");
+                int id = Integer.parseInt(parts[parts.length - 1]);
+
+                System.out.println(id);
+
+                Vehicle vehicle = new Vehicle();
+
+                vehicle.setId(id);
+                vehicle.setName(item.get("name").toString());
+                vehicle.setModel(item.get("model").toString());
+
+                vehiclesList.add(vehicle);
             }
 
-            response.close();
-
-        } while (nextPage);
-
-        ArrayList<Vehicle> vehiclesList = new ArrayList<Vehicle>();
-
-        for (JSONObject item : resultsList ) {
-
-            String urlWithId = (String) item.get("url");
-
-            String[] parts = urlWithId.split("/");
-            int id = Integer.parseInt(parts[parts.length-1]);
-
-            System.out.println(id);
-
-            Vehicle vehicle = new Vehicle();
-
-            vehicle.setId(id);
-            vehicle.setName(item.get("name").toString());
-            vehicle.setModel(item.get("model").toString());
-
-            vehiclesList.add(vehicle);
         }
 
-        httpClient.close();
-
-        return new ResponseEntity(vehiclesList,HttpStatus.OK);
+        return new ResponseEntity<>(vehiclesList,HttpStatus.OK);
 
     }
 
     @GetMapping(path = "getOne/{id}")
-    public ResponseEntity getOneVehicle() throws IOException, InterruptedException, ParseException {
+    public ResponseEntity<Vehicle> getOneVehicle(@PathVariable int id) throws IOException, ParseException {
 
-        CloseableHttpClient httpClient = HttpClients.createDefault();
+        JSONObject json;
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
 
-        Boolean nextPage;
+            JSONParser parser = new JSONParser();
+            HttpGet request = new HttpGet(uri + id);
 
-        JSONParser parser = new JSONParser();
-        ArrayList<JSONObject> resultsList = new ArrayList<JSONObject>();
-
-        do {
-            nextPage = false;
-            HttpGet request = new HttpGet(uri); // montando a request
             CloseableHttpResponse response = httpClient.execute(request); // onde dá o play
 
             HttpEntity entity = response.getEntity();
             String responseString = EntityUtils.toString(entity, "UTF-8");
 
-            JSONObject json = (JSONObject) parser.parse(responseString);
-            resultsList.addAll((ArrayList<JSONObject>) json.get("results"));
-
-            if (!(json.get("next") == null)) {
-                uri = json.get("next").toString();
-                nextPage = true;
-
-            }
-
-            response.close();
-
-        } while (nextPage);
-
-        ArrayList<Vehicle> vehiclesList = new ArrayList<Vehicle>();
-
-        for (JSONObject item : resultsList ) {
-
-            String urlWithId = (String) item.get("url");
-
-            String[] parts = urlWithId.split("/");
-            int id = Integer.parseInt(parts[parts.length-1]);
-
-            System.out.println(id);
-
+            json = (JSONObject) parser.parse(responseString);
             Vehicle vehicle = new Vehicle();
 
             vehicle.setId(id);
-            vehicle.setName(item.get("name").toString());
-            vehicle.setModel(item.get("model").toString());
+            vehicle.setName(json.get("name").toString());
+            vehicle.setModel(json.get("model").toString());
 
-            vehiclesList.add(vehicle);
+            response.close();
+
+            return new ResponseEntity<>(vehicle,HttpStatus.OK);
         }
-
-        httpClient.close();
-
-        return new ResponseEntity(vehiclesList,HttpStatus.OK);
-
     }
-
-
 
 }
 
